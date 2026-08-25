@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import * as XLSX from "xlsx";
-import { addIssue, updateStatus } from "./actions";
+import { addIssue, updateStatus, deleteIssue } from "./actions";
 
 const 유형목록 = ["가격변동", "납기지연", "품질문제", "계약변경", "기타"];
 const 상태목록 = ["신규", "진행중", "완료"];
@@ -14,6 +14,7 @@ export type Issue = {
   유형: string;
   내용: string;
   상태: string;
+  발생일: string | null;
   created_at: string;
 };
 
@@ -42,6 +43,7 @@ export default function IssueTracker({ user, issues }: Props) {
   const [국가, set국가] = useState("");
   const [유형, set유형] = useState(유형목록[0]);
   const [내용, set내용] = useState("");
+  const [발생일, set발생일] = useState(() => new Date().toISOString().slice(0, 10));
   const [필터, set필터] = useState("전체");
   const [등록오류, set등록오류] = useState("");
 
@@ -50,7 +52,7 @@ export default function IssueTracker({ user, issues }: Props) {
     set등록오류("");
     startTransition(async () => {
       try {
-        await addIssue({ 거래처, 국가, 유형, 내용 });
+        await addIssue({ 거래처, 국가, 유형, 내용, 발생일 });
         set거래처("");
         set국가("");
         set내용("");
@@ -66,6 +68,13 @@ export default function IssueTracker({ user, issues }: Props) {
     });
   };
 
+  const 이슈삭제 = (id: number) => {
+    if (!window.confirm("이 이슈를 삭제할까요? 되돌릴 수 없습니다.")) return;
+    startTransition(() => {
+      deleteIssue(id);
+    });
+  };
+
   const 엑셀다운로드 = () => {
     const 데이터 = issues.map((i) => ({
       거래처: i.거래처,
@@ -73,7 +82,8 @@ export default function IssueTracker({ user, issues }: Props) {
       유형: i.유형,
       내용: i.내용,
       상태: i.상태,
-      날짜: i.created_at,
+      발생일: i.발생일 || "",
+      등록일: i.created_at,
     }));
     const ws = XLSX.utils.json_to_sheet(데이터);
     const wb = XLSX.utils.book_new();
@@ -123,10 +133,14 @@ export default function IssueTracker({ user, issues }: Props) {
           <input placeholder="국가" value={국가} onChange={(e) => set국가(e.target.value)}
             style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc" }} />
         </div>
-        <select value={유형} onChange={(e) => set유형(e.target.value)}
-          style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc", width: "100%", marginBottom: "0.5rem" }}>
-          {유형목록.map((u) => <option key={u}>{u}</option>)}
-        </select>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "0.5rem" }}>
+          <select value={유형} onChange={(e) => set유형(e.target.value)}
+            style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc" }}>
+            {유형목록.map((u) => <option key={u}>{u}</option>)}
+          </select>
+          <input type="date" value={발생일} onChange={(e) => set발생일(e.target.value)}
+            style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc" }} />
+        </div>
         <textarea placeholder="이슈 내용" value={내용} onChange={(e) => set내용(e.target.value)} rows={3}
           style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc", width: "100%", marginBottom: "0.5rem", boxSizing: "border-box" }} />
         {등록오류 && <p style={{ color: "red", fontSize: "12px", marginBottom: "0.5rem" }}>{등록오류}</p>}
@@ -163,7 +177,7 @@ export default function IssueTracker({ user, issues }: Props) {
               <strong>{이슈.거래처}</strong>
               <span style={{ fontSize: "12px", color: "#888" }}>{이슈.국가}</span>
             </div>
-            <span style={{ fontSize: "12px", color: "#999" }}>{이슈.created_at}</span>
+            <span style={{ fontSize: "12px", color: "#999" }}>{이슈.발생일 || "-"} 발생 · {이슈.created_at} 등록</span>
           </div>
           <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
             <span style={{ fontSize: "12px", padding: "2px 10px", borderRadius: "20px",
@@ -172,10 +186,16 @@ export default function IssueTracker({ user, issues }: Props) {
               background: 상태색[이슈.상태]?.bg, color: 상태색[이슈.상태]?.color }}>{이슈.상태}</span>
           </div>
           <p style={{ margin: "0 0 8px", fontSize: "14px", color: "#555" }}>{이슈.내용}</p>
-          <select value={이슈.상태} onChange={(e) => 상태변경(이슈.id, e.target.value)} disabled={isPending}
-            style={{ padding: "0.25rem", borderRadius: "4px", border: "1px solid #ccc", fontSize: "13px" }}>
-            {상태목록.map((s) => <option key={s}>{s}</option>)}
-          </select>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <select value={이슈.상태} onChange={(e) => 상태변경(이슈.id, e.target.value)} disabled={isPending}
+              style={{ padding: "0.25rem", borderRadius: "4px", border: "1px solid #ccc", fontSize: "13px" }}>
+              {상태목록.map((s) => <option key={s}>{s}</option>)}
+            </select>
+            <button onClick={() => 이슈삭제(이슈.id)} disabled={isPending}
+              style={{ padding: "0.25rem 0.75rem", background: "white", color: "#c0392b", border: "1px solid #e0b4b4", borderRadius: "4px", cursor: isPending ? "default" : "pointer", fontSize: "13px" }}>
+              삭제
+            </button>
+          </div>
         </div>
       ))}
     </main>
