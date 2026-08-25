@@ -46,5 +46,12 @@ async function initSchema() {
       created_at text DEFAULT to_char(now() AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD HH24:MI:SS')
     );
     ALTER TABLE issues ADD COLUMN IF NOT EXISTS 발생일 text;
+    ALTER TABLE issues ADD COLUMN IF NOT EXISTS 입고차수 text;
+    ALTER TABLE issues ADD COLUMN IF NOT EXISTS 구분 text NOT NULL DEFAULT '수입';
+    ALTER TABLE issues ADD COLUMN IF NOT EXISTS 제품군 text;
+    ALTER TABLE issues ADD COLUMN IF NOT EXISTS 불량증상 text;
+    ALTER TABLE issues ADD COLUMN IF NOT EXISTS 보상방안 text;
+    ALTER TABLE issues ADD COLUMN IF NOT EXISTS 처리결과 text;
+    ALTER TABLE issues ALTER COLUMN 내용 DROP NOT NULL;
   `);
 }
